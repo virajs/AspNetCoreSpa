@@ -118,12 +118,28 @@ namespace AspNetCoreSpa.Server.Controllers.api
 
         [HttpGet("ExternalLogin")]
         [AllowAnonymous]
-        public IActionResult ExternalLogin(string provider, string returnUrl = null)
+        public async Task<IActionResult> ExternalLogin(string provider, string returnUrl = null)
         {
-            // Request a redirect to the external login provider.
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+
+            if (info?.LoginProvider == provider)
+                return RedirectToAction(nameof(ExternalLoginCallback), "Account");
+
+            if (info != null)
+                await _signInManager.SignOutAsync();
+
+            // Redirect needed to logout
+            // Issue https://github.com/aspnet/Identity/issues/915
+            return RedirectToAction(nameof(ExternalLoginRedirect), "Account", new { provider, returnUrl });
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult ExternalLoginRedirect(string provider, string returnUrl = null)
+        {
             var redirectUrl = Url.Action("ExternalLoginCallback", "Account", new { ReturnUrl = returnUrl });
             var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
-            return Challenge(properties, provider);
+            return new ChallengeResult(provider, properties);
         }
 
         [HttpGet("ExternalLoginCallback")]
